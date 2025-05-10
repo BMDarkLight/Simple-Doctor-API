@@ -180,6 +180,65 @@ def create_appointment(appointment: Appointment):
         "appointment_id": str(result.inserted_id)
     }
 
+@app.put("/api/v1/appointments/{appointment_id}")
+def get_appointment(appointment_id: str, new_appointment: Appointment):
+    if not isValidObjectId(appointment_id):
+        raise HTTPException(status_code=400, detail="Invalid appointment ID format")
+    
+    appointment = appointments_collection.find_one({"_id": ObjectId(appointment_id)})
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    
+    isR = appointments_collection.delete_one({"_id": ObjectId(appointment_id)})
+
+    if not isR:
+        return {
+            "success": False,
+            "message": "Failed to modify appointments"
+        }
+    
+    app = {
+        #"user_id": users_collection.find_one({"email": creds.email})
+        "doctor_id": new_appointment.doctor_id,
+        "date": new_appointment.date,
+        "time_slot": new_appointment.time_slot,
+        "status": "booked",
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    result = appointments_collection.insert_one(app)
+
+    return {
+        "success": True,
+        "message": "Appointment booked successfully.",
+        "appointment_id": str(result.inserted_id)
+    }
+
+    
+
+
+@app.delete("/api/v1/appointments/{appointment_id}")
+def delete_appointment(appointment_id: str):
+    if not isValidObjectId(appointment_id):
+        raise HTTPException(status_code=400, detail="Invalid appointment ID format")
+    
+    appointment = appointments_collection.find_one({"_id": ObjectId(appointment_id)})
+
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    
+    if appointments_collection.delete_one({"_id": ObjectId(appointment_id)}):
+        return {
+            "success": True,
+            "message": "Appointment removed successfully.",
+        }
+    else:
+        return {
+            "success": False,
+            "message": "Failed to remove appointment from database.",
+        }
 
 @app.get("/")
 def root():
