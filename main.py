@@ -1,5 +1,5 @@
 from bson import ObjectId
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime, timedelta
@@ -47,6 +47,7 @@ client = MongoClient("localhost",27017)
 db = client["starcoach-db"]
 doctors_collection = db["doctors"]
 users_collection = db["users"]
+appointments_collection = db["appointments"]
 
 class Credentials(BaseModel):
     email: str
@@ -61,6 +62,12 @@ class Doctor(BaseModel):
     name: str
     specialty: str
     available_slots: List[Slot]
+
+class Appointment(BaseModel):
+    doctor_id: str
+    date: str
+    time_slot: str
+
 
 def isValidObjectId(object_id: str) -> bool:
     try:
@@ -126,7 +133,7 @@ def signup(creds: Credentials):
     hashed_password = hashPass(creds.password)
     user = {
         "email": creds.email,
-        "password": hashed_password,
+        "hashed_password": hashed_password,
         "created_at": datetime.utcnow().isoformat()
     }
 
@@ -146,6 +153,32 @@ def signin(creds: Credentials):
     access_token = genAccessToken({"sub": creds.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/api/v1/appointments")
+def list_appointments() :
+    appointments = list(appointments_collection.find())
+    for appt in appointments:
+        appt["_id"] = str(appt["_id"])
+    return {"success": True, "appointments": appointments}
+    
+@app.post("/api/v1/appointments")
+def create_appointment(appointment: Appointment):
+    app = {
+        #"user_id": users_collection.find_one({"email": creds.email})
+        "doctor_id": appointment.doctor_id,
+        "date": appointment.date,
+        "time_slot": appointment.time_slot,
+        "status": "booked",
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    result = appointments_collection.insert_one(app)
+
+    return {
+        "success": True,
+        "message": "Appointment booked successfully.",
+        "appointment_id": str(result.inserted_id)
+    }
 
 
 @app.get("/")
